@@ -1,0 +1,58 @@
+name = "honeypot-waf"
+main = "src/worker.ts"
+compatibility_date = "2026-09-23"
+
+# ─── 6 个工业站点域名接管 ──────────────────────────────────────
+routes = [
+  { pattern = "www.dafangmachine.com/*", zone_name = "dafangmachine.com" },
+  { pattern = "www.nucleon-crane.com.cn/*", zone_name = "nucleon-crane.com.cn" },
+  { pattern = "www.voittocranes.com/*", zone_name = "voittocranes.com" },
+  { pattern = "www.cranehaitai.com/*", zone_name = "cranehaitai.com" },
+  { pattern = "www.nucleon-cranes.cn/*", zone_name = "nucleon-cranes.cn" },
+  { pattern = "www.dafangcrane.com.cn/*", zone_name = "dafangcrane.com.cn" }
+]
+
+# ─── 单 IP 阶梯封禁独立存储桶 ───────────────────────────────────
+[[kv_namespaces]]
+binding = "HONEYPOT_KV"
+id = "9d22e259ad3d4e24b4e4a7183153d5cb"
+
+# ─── 运行时环境变量 ──────────────────────────────────────────
+[vars]
+# 1. 阈值与滑动窗口设定
+STATUS_404_WINDOW_SECONDS = "60"   # 404 监控短窗口（秒）
+STATUS_404_THRESHOLD = "8"          # 60 秒内累计 8 次 404 判定为扫站并封禁
+HIGH_RISK_THRESHOLD = "3"           # High Risk 可疑探测累计上限（第 3 次封禁）
+
+# 2. 应急 IP 白名单（填写你的公网出口 IP，逗号分隔；为空时不生效）
+WHITELIST_IPS = ""
+
+# 3. 蜜罐诱捕路径
+HONEYPOT_PATHS = '^/(admin_trap|wp-check-login\.php|fake-auth|user/debug-api)'
+
+# 4. 白名单 AI 大模型与搜索爬虫（允许抓取收录）
+ALLOWED_AI_BOT_PATTERN = 'gptbot|chatgpt-user|claudebot|claude-web|gemini|perplexitybot|applebot'
+
+# 5. 垃圾扫描工具、无用爬虫与 SEO 采集脚本（直接阻断）
+BAD_BOT_PATTERN = 'mj12bot|semrushbot|ahrefsbot|dotbot|blexbot|zoominfobot|linespider|headlesschrome|python-requests|go-http-client|zgrab|masscan|sqlmap|nmap'
+
+# 6. 第一层：Critical Exploit 绝对致命指纹（一击必杀直接 Ban，零回源）
+CRITICAL_EXPLOIT_PATTERN = '(\/\.env(\.|$))|(\/\.git(\/|$))|(\/\.ssh(\/|$))|id_rsa|id_ed25519|\.key$|\.pem$|proc\/self\/|\/environ|serviceaccount|\/sa\.json$|\/auth\.json$|wp-config\.php\.bak'
+
+# 7. 第二层前置：High Risk 可疑探测（累积 3 次封禁，已移除前端打包文件干扰）
+HIGH_RISK_PATTERN = '\.(sql|bak|old|dump|swp)$|^\/phpinfo|^\/swagger|^\/actuator|^\/debug\/pprof|^\/vendor\/phpunit|^\/\.vscode|^\/\.ftp'
+
+# ─── Cloudflare Workers 日志与追踪 ───────────────────────────
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1.0
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1.0
+persist = true
